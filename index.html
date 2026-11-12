@@ -69,7 +69,35 @@
     .player-row {
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
+      padding: 3px 4px;
+      border-radius: 6px;
+      transition: background 0.15s, border-color 0.15s;
+    }
+
+    .player-row.is-seed-row {
+      background: #fff9e6;
+      border: 1px solid #ffe082;
+    }
+
+    .seed-btn {
+      font-size: 11px;
+      min-width: 28px;
+      height: 28px;
+      padding: 0 4px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .seed-btn.is-active {
+      background: #ffc107;
+      color: #212529;
+      border-color: #ffb300;
+      font-weight: 700;
     }
 
     /* ===== TOURNAMENT SCREEN ===== */
@@ -367,12 +395,41 @@
         <!-- 参加者名 -->
         <div class="mb-4">
           <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-            <label class="form-label fw-semibold mb-0">📝 参加者名 <span class="text-muted fw-normal small">（省略可）</span></label>
-            <div class="btn-group btn-group-sm">
+            <div>
+              <label class="form-label fw-semibold mb-0">📝 参加者名 &amp; シード設定</label>
+              <div class="text-muted small" style="font-size:11px">⭐ボタンでシード指定できます（シード選手は上位枠に固定）</div>
+            </div>
+            <div class="btn-group btn-group-sm flex-wrap gap-1">
+              <!-- シャッフルドロップダウン -->
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-success dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-shuffle me-1"></i>シャッフル
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                  <li><button class="dropdown-item small" type="button" onclick="shuffleAllPlayers()"><i class="bi bi-arrow-repeat me-2 text-success"></i>全員をランダム抽選（全シャッフル）</button></li>
+                  <li><button class="dropdown-item small" type="button" onclick="shuffleNonSeedPlayers()"><i class="bi bi-star-fill me-2 text-warning"></i>シード選手を固定してシャッフル</button></li>
+                </ul>
+              </div>
+
+              <!-- シード一括設定ドロップダウン -->
+              <div class="btn-group btn-group-sm">
+                <button type="button" class="btn btn-outline-warning text-dark dropdown-toggle" data-bs-toggle="dropdown" aria-expanded="false">
+                  <i class="bi bi-star-fill text-warning me-1"></i>シード枠
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end shadow-sm border-0">
+                  <li><button class="dropdown-item small" type="button" onclick="setBulkSeeds(2)">⭐ 上位2名をシード</button></li>
+                  <li><button class="dropdown-item small" type="button" onclick="setBulkSeeds(4)">⭐ 上位4名をシード</button></li>
+                  <li><button class="dropdown-item small" type="button" onclick="setBulkSeeds(8)">⭐ 上位8名をシード</button></li>
+                  <li><button class="dropdown-item small" type="button" onclick="setBulkSeeds(16)">⭐ 上位16名をシード</button></li>
+                  <li><hr class="dropdown-divider my-1"></li>
+                  <li><button class="dropdown-item small text-danger" type="button" onclick="setBulkSeeds(0)"><i class="bi bi-x-circle me-1"></i>すべてのシードを解除</button></li>
+                </ul>
+              </div>
+
               <button class="btn btn-outline-primary" type="button" data-bs-toggle="collapse" data-bs-target="#bulkNameBox">
-                <i class="bi bi-card-text me-1"></i>テキスト一括登録
+                <i class="bi bi-card-text me-1"></i>一括登録
               </button>
-              <button class="btn btn-outline-secondary" onclick="autoFillNames()">連番入力</button>
+              <button class="btn btn-outline-secondary" onclick="autoFillNames()">連番</button>
               <button class="btn btn-outline-danger" onclick="clearNames()">クリア</button>
             </div>
           </div>
@@ -685,19 +742,135 @@ function applyBulkText() {
 }
 
 function renderPlayerGrid(count) {
-  const grid     = document.getElementById('playerGrid');
-  const existing = [...grid.querySelectorAll('.pname-inp')].map(el => el.value);
+  const grid = document.getElementById('playerGrid');
+  const existing = [...grid.querySelectorAll('.player-row')].map(r => ({
+    name: r.querySelector('.pname-inp')?.value || '',
+    isSeed: r.dataset.seed === 'true',
+  }));
+
   grid.innerHTML = '';
 
   for (let i = 0; i < count; i++) {
+    const prev = existing[i] || { name: '', isSeed: false };
     const row = document.createElement('div');
-    row.className = 'player-row';
+    row.className = 'player-row' + (prev.isSeed ? ' is-seed-row' : '');
+    row.id = `pRow-${i}`;
+    row.dataset.seed = prev.isSeed ? 'true' : 'false';
+
     row.innerHTML =
-      `<span class="badge bg-secondary" style="font-size:10px;min-width:24px">${i + 1}</span>` +
+      `<span class="badge bg-secondary row-num" style="font-size:10px;min-width:24px">${i + 1}</span>` +
+      `<button type="button" class="btn btn-sm btn-outline-warning seed-btn ${prev.isSeed ? 'is-active' : ''}"
+              onclick="toggleSeedRow(${i})" title="シード指定の切り替え">
+        <i class="bi ${prev.isSeed ? 'bi-star-fill' : 'bi-star'}"></i>
+      </button>` +
       `<input type="text" class="form-control form-control-sm pname-inp"
-              placeholder="選手${i + 1}" value="${escHtml(existing[i] || '')}">`;
+              placeholder="選手${i + 1}" value="${escHtml(prev.name)}">`;
     grid.appendChild(row);
   }
+  updateSeedBadges();
+}
+
+// シードのON/OFF切り替え
+function toggleSeedRow(index) {
+  const row = document.getElementById(`pRow-${index}`);
+  if (!row) return;
+  const isSeed = row.dataset.seed === 'true';
+  row.dataset.seed = (!isSeed).toString();
+  row.classList.toggle('is-seed-row', !isSeed);
+
+  const btn = row.querySelector('.seed-btn');
+  if (btn) {
+    btn.classList.toggle('is-active', !isSeed);
+  }
+  updateSeedBadges();
+}
+
+// シード順位バッジの更新
+function updateSeedBadges() {
+  const rows = [...document.querySelectorAll('.player-row')];
+  let seedRank = 1;
+  rows.forEach(row => {
+    const isSeed = row.dataset.seed === 'true';
+    const btn = row.querySelector('.seed-btn');
+    if (isSeed) {
+      if (btn) {
+        btn.innerHTML = `⭐${seedRank}`;
+        btn.title = `第${seedRank}シード（クリックで解除）`;
+      }
+      seedRank++;
+    } else {
+      if (btn) {
+        btn.innerHTML = `<i class="bi bi-star"></i>`;
+        btn.title = `シードに指定する`;
+      }
+    }
+  });
+}
+
+// シード一括設定（上位N名をシード）
+function setBulkSeeds(count) {
+  const rows = [...document.querySelectorAll('.player-row')];
+  rows.forEach((row, i) => {
+    const isSeed = (i < count);
+    row.dataset.seed = isSeed ? 'true' : 'false';
+    row.classList.toggle('is-seed-row', isSeed);
+    const btn = row.querySelector('.seed-btn');
+    if (btn) {
+      btn.classList.toggle('is-active', isSeed);
+    }
+  });
+  updateSeedBadges();
+}
+
+// Fisher-Yates シャッフル
+function fisherYatesShuffle(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+// 全員シャッフル（完全ランダム抽選）
+function shuffleAllPlayers() {
+  const inputs = [...document.querySelectorAll('.pname-inp')];
+  const names = inputs.map((inp, i) => inp.value.trim() || `選手${i + 1}`);
+
+  fisherYatesShuffle(names);
+
+  inputs.forEach((inp, i) => {
+    inp.value = names[i];
+  });
+  alert('すべての参加者をランダムにシャッフル（抽選）しました！🎲');
+}
+
+// シード選手を固定して、一般参加者をシャッフル
+function shuffleNonSeedPlayers() {
+  const rows = [...document.querySelectorAll('.player-row')];
+  const nonSeedIndices = [];
+  const nonSeedNames = [];
+
+  rows.forEach((row, i) => {
+    const isSeed = (row.dataset.seed === 'true');
+    const inp = row.querySelector('.pname-inp');
+    const name = inp.value.trim() || `選手${i + 1}`;
+    if (!isSeed) {
+      nonSeedIndices.push(i);
+      nonSeedNames.push(name);
+    }
+  });
+
+  if (nonSeedIndices.length <= 1) {
+    alert('シャッフルする一般選手が2名以上必要です。');
+    return;
+  }
+
+  fisherYatesShuffle(nonSeedNames);
+
+  nonSeedIndices.forEach((rowIndex, k) => {
+    rows[rowIndex].querySelector('.pname-inp').value = nonSeedNames[k];
+  });
+  alert('⭐ シード選手を固定したまま、一般参加者をランダムにシャッフルしました！🎲');
 }
 
 function autoFillNames() {
@@ -708,21 +881,41 @@ function autoFillNames() {
 
 function clearNames() {
   document.querySelectorAll('.pname-inp').forEach(inp => inp.value = '');
+  setBulkSeeds(0);
 }
 
 function startTournament() {
   const count = clamp(parseInt(document.getElementById('inputCount').value) || 8, 2, 248);
   const name  = document.getElementById('inTournamentName').value.trim() || 'トーナメント大会';
 
-  const inputs  = document.querySelectorAll('.pname-inp');
-  const players = [];
-  for (let i = 0; i < count; i++) {
-    players.push({
-      id:   `P${i + 1}`,
-      name: (inputs[i]?.value.trim()) || `選手${i + 1}`,
-      seed: i + 1,
-    });
-  }
+  const rows = [...document.querySelectorAll('.player-row')];
+  
+  // シード指定選手と一般選手を抽出
+  const seedPlayers = [];
+  const normalPlayers = [];
+
+  rows.forEach((row, i) => {
+    if (i >= count) return;
+    const inp = row.querySelector('.pname-inp');
+    const pName = (inp?.value.trim()) || `選手${i + 1}`;
+    const isSeed = (row.dataset.seed === 'true');
+
+    if (isSeed) {
+      seedPlayers.push({ name: pName, originalIndex: i });
+    } else {
+      normalPlayers.push({ name: pName, originalIndex: i });
+    }
+  });
+
+  // シード選手を上位（Seed 1, 2, ...）にし、その後に一般選手を配置
+  const orderedList = [...seedPlayers, ...normalPlayers];
+  const players = orderedList.map((item, idx) => ({
+    id: `P${idx + 1}`,
+    name: item.name,
+    seed: idx + 1,
+    isSeed: (idx < seedPlayers.length),
+    seedRank: (idx < seedPlayers.length) ? (idx + 1) : null
+  }));
 
   const bracketSize = nextPow2(count);
   const numRounds   = Math.log2(bracketSize);
@@ -1171,7 +1364,14 @@ function playerSlotHTML(mId, slot) {
   else if (isWin)     cls += ' mp-winner';
   else if (isLose)    cls += ' mp-loser'; // 敗者を薄暗く表示
 
-  const seedEl = (player && T.config.showSeed) ? `<span class="p-seed">${player.seed}</span>` : '';
+  let seedEl = '';
+  if (player) {
+    if (player.isSeed) {
+      seedEl = `<span class="badge bg-warning text-dark me-1 fw-bold" style="font-size:9px;padding:2px 4px;flex-shrink:0">⭐${player.seedRank}</span>`;
+    } else if (T.config.showSeed) {
+      seedEl = `<span class="p-seed">${player.seed}</span>`;
+    }
+  }
   const chkEl  = isWin ? '<span class="p-chk text-success">✓</span>' : '';
 
   return `<div class="${cls}">${seedEl}<span class="p-name">${escHtml(displayName)}</span>${chkEl}</div>`;
